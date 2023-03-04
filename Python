@@ -1,0 +1,100 @@
+import pandas as pd
+import numpy as np
+import re
+import nltk
+from transformers import AutoModelForSequenceClassification,AutoTokenizer
+from scipy.special import softmax
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
+ 
+dfmain=pd.read_excel('1.BookGenShort.xlsx')
+df=dfmain[['Bookid','Title','Age','Gen']]
+df['Title'] =df['Title'].astype(str)
+
+age=int(input("Your Age:")) 
+agegroup=str()
+
+if age<=12: 
+    agegroup=('Juvenile')
+    print(agegroup)
+elif age<=17: 
+    agegroup="Teen"
+    print(agegroup)
+elif age>=18: 
+    agegroup="Adult"
+    print(agegroup)
+
+df=df[df["Age"] == agegroup] 
+""" Filter by age"""
+df=pd.DataFrame(df)
+ 
+df['Clean_Genres'] =df['Gen'].str.lower()
+df['Clean_Genres'] =df['Gen'].astype(str)
+df['Clean_Genres'] =df['Clean_Genres'].apply(lambda x: re.sub('[^a-zA-Z]', ' ', x))
+df['Clean_Genres'] =df['Clean_Genres'].apply(lambda x: re.sub('\s+', ' ', x))
+df['Clean_Genres']
+df['Clean_Genres'] =df['Clean_Genres'].apply(lambda x: nltk.word_tokenize(x))
+df['Clean_Genres'] =df['Gen'].astype(str)
+df=df.drop('Gen',axis='columns') 
+df["indx"]=[i for i in range(0,df.shape[0])]
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer()
+features = tfidf.fit_transform(df['Clean_Genres'])
+
+from sklearn.metrics.pairwise import cosine_similarity
+cosine_sim = cosine_similarity(features, features)
+
+book_choice=('Intruder')
+
+def recommend2(bytitle):
+    book_id=df[df.Title==bytitle]["indx"].values[0]
+    scores=pd.Series(cosine_sim[book_id]).sort_values(ascending=False)[0:1000]
+    scores2=list(enumerate(cosine_sim[book_id]))
+    sorted_scores=sorted(scores2,key=lambda x:x[1],reverse=True)[0:1000]
+    books=[df[books[0]==df["indx"]]["Title"].values[0] for books in sorted_scores]
+    return(pd.DataFrame({'Title':books,'SimilarityScores':scores}))
+
+RecommendedList=recommend2(book_choice).merge(df, on="Title")
+
+Revs=RecommendedList.merge(pd.read_excel('Rev.xlsx'), on="Bookid")
+  
+b=[]
+ 
+c=[]
+
+sia=SentimentIntensityAnalyzer()
+
+for y in Revs["Rev1"]:
+    c=sia.polarity_scores(str(y))
+    b.append((c))
+    ol=pd.DataFrame(b[0:1000])
+    q1=pd.concat([Revs["Rev1"],ol],axis=1)
+
+for y2 in Revs["Rev2"]:
+    c=sia.polarity_scores(str(y2))
+    b.append((c))
+    ol=pd.DataFrame(b[1000:2000])
+    q2=pd.concat([Revs["Rev2"],ol],axis=1)
+
+for y3 in Revs["Rev3"]:
+    c=sia.polarity_scores(str(y3))
+    b.append((c))
+    ol=pd.DataFrame(b[2000:3000])
+    q3=pd.concat([Revs["Rev3"],ol],axis=1)
+
+for y4 in Revs["Rev4"]:
+    c=sia.polarity_scores(str(y4))
+    b.append((c))
+    ol=pd.DataFrame(b[3000:4000])
+    q4=pd.concat([Revs["Rev4"],ol],axis=1)
+
+for y5 in Revs["Rev5"]:
+    c=sia.polarity_scores(str(y5))
+    b.append((c))
+    ol=pd.DataFrame(b[4000:5000])
+    q5=pd.concat([Revs["Rev5"],ol],axis=1)
+
+DetailedList=pd.concat([Revs,q1,q2,q3,q4,q5,q1["compound"]+q2["compound"]+q3["compound"]+q4["compound"]+q5["compound"]],axis=1)
+
+RecommendedList=pd.concat([Revs,q1["compound"]+q2["compound"]+q3["compound"]+q4["compound"]+q5["compound"]],axis=1)
